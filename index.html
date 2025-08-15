@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Construction Cost Estimation & Planning Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .gantt-chart-container {
+            overflow-x: auto;
+        }
+        .gantt-grid {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            align-items: center;
+        }
+        .gantt-task-bar {
+            position: absolute;
+            height: 24px;
+            background-color: #3b82f6;
+            border-radius: 0.25rem;
+            color: white;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .gantt-task-bar:hover {
+            background-color: #2563eb;
+        }
+        .dependency-line {
+            position: absolute;
+            stroke: #ef4444;
+            stroke-width: 2;
+            fill: none;
+            pointer-events: none;
+        }
+        .tooltip {
+            position: absolute;
+            background-color: #1f2937;
+            color: white;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            z-index: 10;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Construction Cost Estimation & Planning Tool</h1>
+            <p class="text-gray-600 mt-1">Automate cost estimation and scheduling for residential projects (Jan 2025 – Feb 2025)</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Left Column: Inputs -->
+            <div class="lg:col-span-1 space-y-6">
+                <!-- Project Details Card -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4">Project Details</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="projectName" class="block text-sm font-medium text-gray-700">Project Name</label>
+                            <input type="text" id="projectName" value="Small Residential House" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="startDate" class="block text-sm font-medium text-gray-700">Start Date</label>
+                            <input type="date" id="startDate" value="2025-01-01" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resources Card -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4">Manage Resources</h2>
+                    <form id="resourceForm" class="space-y-4">
+                        <input type="text" id="resourceName" placeholder="Resource Name (e.g., Cement)" class="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm" required>
+                        <select id="resourceType" class="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                            <option value="material">Material</option>
+                            <option value="labor">Labor</option>
+                        </select>
+                        <input type="number" id="resourceCost" placeholder="Cost per unit/hour" class="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm" required>
+                        <button type="submit" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Add Resource</button>
+                    </form>
+                    <div id="resourceList" class="mt-4 space-y-2 max-h-40 overflow-y-auto"></div>
+                </div>
+
+                <!-- Tasks Card -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4">Add Project Tasks</h2>
+                    <form id="taskForm" class="space-y-4">
+                        <input type="text" id="taskName" placeholder="Task Name (e.g., Foundation)" class="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm" required>
+                        <input type="number" id="taskDuration" placeholder="Duration (days)" class="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm" required>
+                        <div>
+                            <label for="taskDependencies" class="block text-sm font-medium text-gray-700">Dependencies (Optional)</label>
+                            <select id="taskDependencies" multiple class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-24"></select>
+                        </div>
+                         <div>
+                            <label for="taskResources" class="block text-sm font-medium text-gray-700">Assign Resources</label>
+                            <select id="taskResources" multiple class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-24"></select>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Add Task</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Right Column: Dashboard -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Cost Summary Card -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4">Cost & Timeline Summary</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                        <div>
+                            <p class="text-sm text-gray-500">Total Estimated Cost</p>
+                            <p id="totalCost" class="text-2xl font-bold text-green-600">$0</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">Project Duration</p>
+                            <p id="projectDuration" class="text-2xl font-bold">0 Days</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">Completion Date</p>
+                            <p id="completionDate" class="text-2xl font-bold">-</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gantt Chart Card -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4">Project Schedule (Gantt Chart)</h2>
+                    <div id="ganttChart" class="gantt-chart-container">
+                        <!-- Gantt chart will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="tooltip" class="tooltip"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // State management
+            let tasks = [];
+            let resources = [];
+            let taskIdCounter = 1;
+            let resourceIdCounter = 1;
+
+            // DOM Elements
+            const resourceForm = document.getElementById('resourceForm');
+            const resourceList = document.getElementById('resourceList');
+            const taskForm = document.getElementById('taskForm');
+            const taskDependenciesSelect = document.getElementById('taskDependencies');
+            const taskResourcesSelect = document.getElementById('taskResources');
+            
+            const totalCostEl = document.getElementById('totalCost');
+            const projectDurationEl = document.getElementById('projectDuration');
+            const completionDateEl = document.getElementById('completionDate');
+            const ganttChartEl = document.getElementById('ganttChart');
+            const startDateInput = document.getElementById('startDate');
+            const tooltip = document.getElementById('tooltip');
+
+            // --- RESOURCE MANAGEMENT ---
+            resourceForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('resourceName').value;
+                const type = document.getElementById('resourceType').value;
+                const cost = parseFloat(document.getElementById('resourceCost').value);
+
+                if (name && !isNaN(cost)) {
+                    const newResource = { id: resourceIdCounter++, name, type, cost };
+                    resources.push(newResource);
+                    renderResources();
+                    resourceForm.reset();
+                }
+            });
+
+            function renderResources() {
+                resourceList.innerHTML = '';
+                taskResourcesSelect.innerHTML = '';
+                resources.forEach(res => {
+                    // Render in resource list
+                    const div = document.createElement('div');
+                    div.className = 'flex justify-between items-center bg-gray-100 p-2 rounded';
+                    div.innerHTML = `
+                        <span>${res.name} (${res.type}) - $${res.cost}</span>
+                        <button data-id="${res.id}" class="text-red-500 hover:text-red-700 remove-resource">&times;</button>
+                    `;
+                    resourceList.appendChild(div);
+
+                    // Render in task assignment dropdown
+                    const option = document.createElement('option');
+                    option.value = res.id;
+                    option.textContent = `${res.name} ($${res.cost})`;
+                    taskResourcesSelect.appendChild(option);
+                });
+                
+                // Add event listeners for remove buttons
+                document.querySelectorAll('.remove-resource').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const id = parseInt(e.target.getAttribute('data-id'));
+                        resources = resources.filter(r => r.id !== id);
+                        renderAll();
+                    });
+                });
+            }
+
+            // --- TASK MANAGEMENT ---
+            taskForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('taskName').value;
+                const duration = parseInt(document.getElementById('taskDuration').value);
+                
+                const dependencies = Array.from(taskDependenciesSelect.selectedOptions).map(opt => parseInt(opt.value));
+                const assignedResources = Array.from(taskResourcesSelect.selectedOptions).map(opt => parseInt(opt.value));
+
+                if (name && !isNaN(duration) && duration > 0) {
+                    const newTask = { 
+                        id: taskIdCounter++, 
+                        name, 
+                        duration, 
+                        dependencies, 
+                        resources: assignedResources,
+                        startDay: 0,
+                        endDay: 0
+                    };
+                    tasks.push(newTask);
+                    renderAll();
+                    taskForm.reset();
+                }
+            });
+
+            function calculateSchedule() {
+                // Reset start/end days
+                tasks.forEach(task => {
+                    task.startDay = 1;
+                    task.endDay = 0;
+                });
+
+                // Topological sort would be ideal, but for simplicity, we iterate
+                // This assumes no circular dependencies.
+                for (let i = 0; i < tasks.length * 2; i++) { // Iterate enough times to resolve dependencies
+                    tasks.forEach(task => {
+                        let maxEndDayOfDeps = 0;
+                        task.dependencies.forEach(depId => {
+                            const depTask = tasks.find(t => t.id === depId);
+                            if (depTask && depTask.endDay > maxEndDayOfDeps) {
+                                maxEndDayOfDeps = depTask.endDay;
+                            }
+                        });
+                        task.startDay = maxEndDayOfDeps + 1;
+                        task.endDay = task.startDay + task.duration - 1;
+                    });
+                }
+            }
+            
+            function renderDependenciesSelect() {
+                taskDependenciesSelect.innerHTML = '';
+                tasks.forEach(task => {
+                    const option = document.createElement('option');
+                    option.value = task.id;
+                    option.textContent = task.name;
+                    taskDependenciesSelect.appendChild(option);
+                });
+            }
+
+            // --- UI RENDERING ---
+            function renderAll() {
+                renderResources();
+                calculateSchedule();
+                renderDependenciesSelect();
+                renderSummary();
+                renderGanttChart();
+            }
+
+            function renderSummary() {
+                let totalCost = 0;
+                tasks.forEach(task => {
+                    task.resources.forEach(resId => {
+                        const resource = resources.find(r => r.id === resId);
+                        if (resource) {
+                            // For simplicity, labor cost is per day of task duration
+                            const costMultiplier = resource.type === 'labor' ? task.duration : 1;
+                            totalCost += resource.cost * costMultiplier;
+                        }
+                    });
+                });
+                totalCostEl.textContent = `$${totalCost.toLocaleString()}`;
+
+                const maxEndDay = tasks.reduce((max, task) => Math.max(max, task.endDay), 0);
+                projectDurationEl.textContent = `${maxEndDay} Days`;
+
+                const startDate = new Date(startDateInput.value);
+                if (!isNaN(startDate.getTime()) && maxEndDay > 0) {
+                    const completionDate = new Date(startDate);
+                    completionDate.setDate(startDate.getDate() + maxEndDay);
+                    completionDateEl.textContent = completionDate.toLocaleDateString();
+                } else {
+                    completionDateEl.textContent = '-';
+                }
+            }
+            
+            function renderGanttChart() {
+                ganttChartEl.innerHTML = '';
+                if (tasks.length === 0) {
+                    ganttChartEl.innerHTML = '<p class="text-gray-500">Add tasks to see the project schedule.</p>';
+                    return;
+                }
+                
+                const totalDays = tasks.reduce((max, task) => Math.max(max, task.endDay), 0);
+                const dayWidth = 40; // width of a day column in pixels
+
+                // Create main grid container
+                const grid = document.createElement('div');
+                grid.className = 'gantt-grid relative';
+                grid.style.width = `${150 + totalDays * dayWidth}px`;
+                
+                // Create header
+                const header = document.createElement('div');
+                header.className = 'col-start-2 grid';
+                header.style.gridTemplateColumns = `repeat(${totalDays}, ${dayWidth}px)`;
+                for (let i = 1; i <= totalDays; i++) {
+                    const dayEl = document.createElement('div');
+                    dayEl.className = 'text-center text-xs font-semibold border-r border-b border-gray-200 py-1';
+                    dayEl.textContent = `Day ${i}`;
+                    header.appendChild(dayEl);
+                }
+                
+                // Create task rows container
+                const rowsContainer = document.createElement('div');
+                rowsContainer.className = 'relative';
+                rowsContainer.style.height = `${tasks.length * 40}px`;
+
+                // Create task labels and grid lines
+                const labels = document.createElement('div');
+                const gridLines = document.createElement('div');
+                gridLines.className = 'col-start-2 grid';
+                gridLines.style.gridTemplateColumns = `repeat(${totalDays}, ${dayWidth}px)`;
+
+                tasks.forEach((task, index) => {
+                    // Label
+                    const label = document.createElement('div');
+                    label.className = 'h-10 flex items-center text-sm font-medium border-b border-gray-200 pl-2';
+                    label.textContent = task.name;
+                    labels.appendChild(label);
+                    
+                    // Grid line
+                    const line = document.createElement('div');
+                    line.className = 'h-10 border-b border-gray-200';
+                    line.style.gridColumn = `1 / -1`;
+                    gridLines.appendChild(line);
+
+                    // Task Bar
+                    const bar = document.createElement('div');
+                    bar.className = 'gantt-task-bar';
+                    bar.style.left = `${(task.startDay - 1) * dayWidth}px`;
+                    bar.style.width = `${task.duration * dayWidth - 4}px`; // -4 for padding
+                    bar.style.top = `${index * 40 + 8}px`;
+                    bar.textContent = task.name;
+                    bar.dataset.taskId = task.id;
+                    rowsContainer.appendChild(bar);
+                });
+                
+                grid.append(labels, header, gridLines, rowsContainer);
+                ganttChartEl.appendChild(grid);
+                
+                // Render dependency lines
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.classList.add('dependency-line');
+                svg.style.width = `${150 + totalDays * dayWidth}px`;
+                svg.style.height = `${tasks.length * 40}px`;
+                svg.style.top = '40px'; // Offset for header
+                svg.style.left = '150px'; // Offset for labels
+
+                tasks.forEach((task, index) => {
+                    task.dependencies.forEach(depId => {
+                        const depTask = tasks.find(t => t.id === depId);
+                        const depIndex = tasks.findIndex(t => t.id === depId);
+                        if (depTask) {
+                            const startX = (depTask.endDay - 0.5) * dayWidth;
+                            const startY = depIndex * 40 + 20;
+                            const endX = (task.startDay - 1.5) * dayWidth;
+                            const endY = index * 40 + 20;
+
+                            const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                            line.setAttribute('d', `M ${startX} ${startY} L ${startX + 10} ${startY} L ${startX + 10} ${endY} L ${endX} ${endY}`);
+                            svg.appendChild(line);
+
+                            const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                            arrow.setAttribute('points', `${endX},${endY} ${endX-5},${endY-5} ${endX-5},${endY+5}`);
+                            arrow.setAttribute('fill', '#ef4444');
+                            svg.appendChild(arrow);
+                        }
+                    });
+                });
+                rowsContainer.appendChild(svg);
+            }
+            
+            // --- TOOLTIP LOGIC ---
+            document.body.addEventListener('mouseover', e => {
+                if (e.target.classList.contains('gantt-task-bar')) {
+                    const taskId = parseInt(e.target.dataset.taskId);
+                    const task = tasks.find(t => t.id === taskId);
+                    if (task) {
+                        const assignedResources = task.resources.map(resId => {
+                            const resource = resources.find(r => r.id === resId);
+                            return resource ? `<li>${resource.name}</li>` : '';
+                        }).join('');
+
+                        tooltip.innerHTML = `
+                            <strong>${task.name}</strong><br>
+                            Duration: ${task.duration} days<br>
+                            Start: Day ${task.startDay}, End: Day ${task.endDay}<br>
+                            <strong>Resources:</strong>
+                            <ul class="list-disc list-inside">${assignedResources || '<li>None</li>'}</ul>
+                        `;
+                        tooltip.style.visibility = 'visible';
+                        tooltip.style.opacity = '1';
+                    }
+                }
+            });
+
+            document.body.addEventListener('mousemove', e => {
+                if (tooltip.style.visibility === 'visible') {
+                    tooltip.style.left = `${e.pageX + 15}px`;
+                    tooltip.style.top = `${e.pageY + 15}px`;
+                }
+            });
+
+            document.body.addEventListener('mouseout', e => {
+                if (e.target.classList.contains('gantt-task-bar')) {
+                    tooltip.style.visibility = 'hidden';
+                    tooltip.style.opacity = '0';
+                }
+            });
+
+            // --- INITIALIZATION ---
+            startDateInput.addEventListener('change', renderSummary);
+            
+            // Add some initial data for demonstration
+            function initializeDemoData() {
+                resources = [
+                    { id: resourceIdCounter++, name: 'Concrete', type: 'material', cost: 100 },
+                    { id: resourceIdCounter++, name: 'Steel', type: 'material', cost: 800 },
+                    { id: resourceIdCounter++, name: 'General Labor', type: 'labor', cost: 200 },
+                    { id: resourceIdCounter++, name: 'Electrician', type: 'labor', cost: 400 },
+                    { id: resourceIdCounter++, name: 'Plumber', type: 'labor', cost: 450 },
+                ];
+                tasks = [
+                    { id: taskIdCounter++, name: 'Foundation', duration: 5, dependencies: [], resources: [1, 2, 3] },
+                    { id: taskIdCounter++, name: 'Framing', duration: 7, dependencies: [1], resources: [3] },
+                    { id: taskIdCounter++, name: 'Plumbing', duration: 4, dependencies: [2], resources: [5] },
+                    { id: taskIdCounter++, name: 'Electrical', duration: 4, dependencies: [2], resources: [4] },
+                    { id: taskIdCounter++, name: 'Finishing', duration: 6, dependencies: [3, 4], resources: [3] },
+                ];
+                renderAll();
+            }
+
+            initializeDemoData();
+        });
+    </script>
+</body>
+</html>
